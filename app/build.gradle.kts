@@ -61,4 +61,9 @@ dependencies {
     implementation(libs.androidx.navigation.runtime.ktx)
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
+
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+
+    implementation(libs.coil.compose)
 }

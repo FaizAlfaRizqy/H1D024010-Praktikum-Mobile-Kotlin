@@ -1,6 +1,7 @@
 package com.pemmob.faizalfarizqy.ui.screen
 
 import android.content.res.Configuration
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,108 +25,122 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.pemmob.faizalfarizqy.R
-import com.pemmob.faizalfarizqy.data.dummy.DummyData
 import com.pemmob.faizalfarizqy.data.model.Category
 import com.pemmob.faizalfarizqy.data.model.Product
 import com.pemmob.faizalfarizqy.ui.theme.MyApplicationTheme
-import kotlinx.coroutines.delay
-
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
+import com.pemmob.faizalfarizqy.ui.viewmodel.ProductUiState
+import com.pemmob.faizalfarizqy.ui.viewmodel.ProductViewModel
+import com.pemmob.faizalfarizqy.util.JualanConstans
+import com.pemmob.faizalfarizqy.util.JualanConstans.BASE_URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DaftarProductScreen(
-    modifier: Modifier = Modifier,
-    onProductClick: (Product) -> Unit = {},
-    onCartClick: () -> Unit = {},
-    navController: NavController? = null
+    navController: NavController? = null,
+    viewModel: ProductViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    var selectedCategoryId by rememberSaveable { mutableStateOf(value = DummyData.categories.firstOrNull()?.id) }
+    var selectedCategoryId by rememberSaveable { mutableStateOf<Int?>(null) }
+
+    val uistate by viewModel.uiState.collectAsState()
     var searchQuery by rememberSaveable { mutableStateOf(value = "") }
-    var isLoading by remember { mutableStateOf(value = false) }
-    var filteredProducts by remember { mutableStateOf(value = emptyList<Product>()) }
 
-    LaunchedEffect(selectedCategoryId, searchQuery) {
-        isLoading = true
-
-        delay(1000)
-
-        val filteredByCategory = if (selectedCategoryId != null) {
-            DummyData.products.filter { it.category_id == selectedCategoryId }
-        } else DummyData.products
-
-        filteredProducts = if (searchQuery.isBlank()) {
-            filteredByCategory
-        } else {
-            filteredByCategory.filter { it.name.contains(other = searchQuery, ignoreCase = true) }
+    when (val state = uistate) {
+        is ProductUiState.Loading -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
         }
-        isLoading = false
+
+        is ProductUiState.Error -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Error: ${state.message}", color = MaterialTheme.colorScheme.error)
+            }
+        }
+
+        is ProductUiState.Success -> {
+            if (selectedCategoryId == null && state.categories.isNotEmpty()) {
+                selectedCategoryId = state.categories.first().id
+            }
+
+            val filteredByCategory = if (selectedCategoryId != null) {
+                state.products.filter { it.category_id == selectedCategoryId }
+            } else {
+                state.products
+            }
+
+            val filteredProducts = if (searchQuery.isBlank()) {
+                filteredByCategory
+            } else {
+                filteredByCategory.filter {
+                    it.name.contains(other = searchQuery, ignoreCase = true)
+                }
+            }
+
+            StatelessDaftarProduct(
+                categories = state.categories,
+                selectedCategoryId = selectedCategoryId,
+                onCategorySelected = { selectedCategoryId = it },
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                isLoading = false,
+                products = filteredProducts,
+                onProductClick = { product ->
+                    if (navController != null) {
+                        navController.navigate("detail/${product.id}")
+                    } else {
+                        Toast.makeText(context, "Membuka Detail: ${product.name}", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onContactUsClick = {
+                    if (navController != null) {
+                        navController.navigate("hubungi_kami")
+                    } else {
+                        Toast.makeText(context, "Membuka Hubungi Kami", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+        }
     }
-
-    StatelessDaftarProduct(
-        modifier = modifier,
-        categories = DummyData.categories,
-        selectedCategoryId = selectedCategoryId,
-        onCategorySelected = { selectedCategoryId = it },
-        searchQuery = searchQuery,
-        onSearchQueryChange = { searchQuery = it },
-        isLoading = isLoading,
-        products = filteredProducts,
-        onProductClick = { product ->
-            onProductClick(product)
-            if (navController != null) {
-                navController.navigate(route = "detail/${product.id}")
-            } else {
-                Toast.makeText(context, "Membuka Detail: ${product.name}", Toast.LENGTH_SHORT).show()
-            }
-        },
-        onCartClick = {
-            onCartClick()
-            if (navController == null) {
-                Toast.makeText(context, "Klik Keranjang", Toast.LENGTH_SHORT).show()
-            }
-        },
-        onContactUsClick = {
-            if (navController != null) {
-                navController.navigate("hubungi_kami")
-            } else {
-                Toast.makeText(context, "Membuka Hubungi Kami", Toast.LENGTH_SHORT).show()
-            }
-        }
-    )
 }
 
 @Composable
 fun ProductItemCard(product: Product, onClick: () -> Unit) {
     Card(
         modifier = Modifier
+            .padding( 8.dp)
             .fillMaxWidth()
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(all = 12.dp)) {
-            val imageRes = R.drawable.ic_launcher_background
+            val imageModel: Any = if (product.img == "dummy_product") {
+                R.drawable.dummy_product
+            } else {
+                "${BASE_URL}/img/${product.img}"
+            }
             Box(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Image(
-                    painter = painterResource(id = imageRes),
+                coil.compose.AsyncImage(
+                    model = imageModel,
                     contentDescription = product.name,
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .clip(shape = RoundedCornerShape(size = 8.dp))
-                        .background(color = Color.White),
+                        .background(color = androidx.compose.ui.graphics.Color.White),
                     contentScale = ContentScale.Fit
                 )
 
@@ -194,7 +209,16 @@ fun CategoryItem(category: Category, isSelected: Boolean, onClick: () -> Unit) {
 @Composable
 fun PreviewDaftarProductScreen() {
     MyApplicationTheme {
-        DaftarProductScreen()
+        StatelessDaftarProduct(
+            categories = emptyList(),
+            selectedCategoryId = null,
+            onCategorySelected = {},
+            searchQuery = "",
+            onSearchQueryChange = {},
+            isLoading = false,
+            products = emptyList(),
+            onProductClick = {}
+        )
     }
 }
 

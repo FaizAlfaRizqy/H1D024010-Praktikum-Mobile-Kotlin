@@ -19,16 +19,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.pemmob.faizalfarizqy.ui.screen.BasicInfoScreen
 import com.pemmob.faizalfarizqy.ui.screen.DaftarProductScreen
 import com.pemmob.faizalfarizqy.ui.screen.DetailProductScreen
 import com.pemmob.faizalfarizqy.ui.screen.HubungiKamiScreen
 import com.pemmob.faizalfarizqy.ui.theme.MyApplicationTheme
+import com.pemmob.faizalfarizqy.ui.viewmodel.ProductViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,12 +42,17 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    NavHost(navController = navController, startDestination = "daftar_produk") {
+                    val productViewModel: ProductViewModel = viewModel()
+
+                    NavHost(
+                        navController = navController,
+                        startDestination = "daftar_produk"
+                    ) {
                         composable(route = "daftar_produk") {
-                            DaftarProductScreen(navController = navController)
-                        }
-                        composable(route = "hubungi_kami") {
-                            HubungiKamiScreen(navController = navController)
+                            DaftarProductScreen(
+                                navController = navController,
+                                viewModel = productViewModel
+                            )
                         }
                         composable(
                             route = "detail/{productId}",
@@ -57,8 +63,12 @@ class MainActivity : ComponentActivity() {
                             val productId = backStackEntry.arguments?.getInt("productId") ?: 0
                             DetailProductScreen(
                                 productId = productId,
-                                navController = navController
+                                navController = navController,
+                                viewModel = productViewModel
                             )
+                        }
+                        composable(route = "hubungi_kami") {
+                            HubungiKamiScreen(navController = navController)
                         }
                     }
                 }
